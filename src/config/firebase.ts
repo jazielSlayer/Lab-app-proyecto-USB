@@ -1,18 +1,28 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  // Replace with your Firebase config
-  apiKey: "AIzaSyAd4cqLrNHNfel_3Yf8yIXNhJguM9d5s1k",
-  authDomain: "proyecto-laboratorio-7eba8.firebaseapp.com",
-  projectId: "proyecto-laboratorio-7eba8",
-  storageBucket: "proyecto-laboratorio-7eba8.firebasestorage.app",
-  messagingSenderId: "1056117155382",
-  appId: "1:1056117155382:web:de28987b92c8d7b364da97",
-  measurementId: "G-3KRNPCYX5J"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENTID
 };
+
+// Validate Firebase config
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  throw new Error('Firebase configuration is incomplete. Please check your .env file.');
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Configure Google Auth Provider
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
