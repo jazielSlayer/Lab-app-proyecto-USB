@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, googleProvider } from '../config/firebase';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, onAuthStateChanged, signInWithRedirect } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { LogIn, Mail, Lock } from 'lucide-react';
@@ -11,18 +11,47 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Login successful:', userCredential.user.email);
       toast.success('Inicio de sesión exitoso');
       navigate('/');
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.code === 'auth/invalid-credential' 
-        ? 'Credenciales inválidas'
-        : 'Error al iniciar sesión');
+      let errorMessage = 'Error al iniciar sesión';
+      
+      switch (error.code) {
+        case 'auth/invalid-credential':
+          errorMessage = 'Credenciales inválidas';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'Usuario no encontrado';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Contraseña incorrecta';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Correo electrónico inválido';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Demasiados intentos fallidos. Intente más tarde';
+          break;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -31,12 +60,42 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      toast.success('Inicio de sesión con Google exitoso');
-      navigate('/');
+      // Intentar primero con popup
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log('Google login successful:', result.user.email);
+        toast.success('Inicio de sesión con Google exitoso');
+        navigate('/');
+      } catch (popupError: any) {
+        // Si el popup es bloqueado, usar redirect
+        if (popupError.code === 'auth/popup-blocked') {
+          toast.loading('Redirigiendo a Google...');
+          await signInWithRedirect(auth, googleProvider);
+          // No necesitamos manejar el éxito aquí ya que el useEffect
+          // con onAuthStateChanged se encargará de la redirección
+        } else {
+          throw popupError;
+        }
+      }
     } catch (error: any) {
       console.error('Google login error:', error);
-      toast.error('Error al iniciar sesión con Google');
+      let errorMessage = 'Error al iniciar sesión con Google';
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Ventana de inicio de sesión cerrada';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage = 'Proceso de inicio de sesión cancelado';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Ventana emergente bloqueada. Permitir ventanas emergentes para este sitio.';
+          break;
+        default:
+          errorMessage = 'Error al iniciar sesión con Google. Por favor, intente nuevamente.';
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
